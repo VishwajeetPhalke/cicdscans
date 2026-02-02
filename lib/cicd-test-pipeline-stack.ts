@@ -26,7 +26,7 @@ export class CicdTestPipelineStack extends cdk.Stack {
               'arn:aws:codeconnections:us-east-1:430058392451:connection/b1b0d224-2619-4c1b-a7cb-b56248c3f529'
           }
         ),
-        commands: ['npm ci', 'npm run build', 'npx cdk synth'],
+        commands: ['npm ci || npm install', 'npm run build', 'npx cdk synth'],
       }),
     });
 
@@ -42,7 +42,7 @@ export class CicdTestPipelineStack extends cdk.Stack {
         'semgrep ci --metrics=off || true',
 
         // SCA: npm audit
-        'npm ci',
+        'npm ci || npm install',
         'npm audit --audit-level=high || true',
 
         // IaC: Checkov
