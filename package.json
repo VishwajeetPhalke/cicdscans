@@ -1,0 +1,25 @@
+{
+  "name": "cicd-security-pipelines",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "cdk": "bin/cicd-app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy-test": "cdk deploy CicdTestPipelineStack",
+    "deploy-prod": "cdk deploy CicdProdPipelineStack",
+    "destroy-test": "cdk destroy CicdTestPipelineStack",
+    "destroy-prod": "cdk destroy CicdProdPipelineStack"
+  },
+  "devDependencies": {
+    "aws-cdk-lib": "^2.132.0",
+    "cdk-nag": "^2.37.55",
+    "constructs": "^10.3.0",
+    "source-map-support": "^0.5.21",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
