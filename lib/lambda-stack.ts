@@ -14,23 +14,18 @@ export class LambdaStack extends cdk.Stack {
       handler: 'index.handler',
       code: lambda.Code.fromInline(`
         exports.handler = async (event) => {
-          console.log("Hello from Lambda (env:", process.env.ENV, ")");
-          return { statusCode: 200, body: "Hello from inline Lambda and team" };
+          return { statusCode: 200, body: "Hello from Lambda" };
         };
       `),
-      environment: {
-        ENV: cdk.Stack.of(this).stackName
-      }
     });
 
     const api = new apigw.LambdaRestApi(this, 'DemoApi', {
       handler: fn,
-      proxy: true
+      proxy: true,
     });
 
     this.apiUrlOutput = new cdk.CfnOutput(this, 'ApiUrl', {
       value: api.url,
-      description: 'Public URL for DAST scanning'
     });
   }
 }

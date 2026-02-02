@@ -8,11 +8,10 @@ export class PipelineAppStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props?: cdk.StageProps) {
     super(scope, id, props);
 
-    const app = new LambdaStack(this, 'LambdaStack', {
-      env: props?.env
+    const lambda = new LambdaStack(this, 'LambdaStack', {
+      env: props?.env,
     });
 
-    // Re-expose for pipeline consumption
-    this.apiUrlOutput = app.apiUrlOutput;
+    this.apiUrlOutput = lambda.apiUrlOutput;
   }
 }

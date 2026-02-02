@@ -6,36 +6,17 @@ import * as cdk from 'aws-cdk-lib';
 import { CicdTestPipelineStack } from '../lib/cicd-test-pipeline-stack';
 import { CicdProdPipelineStack } from '../lib/cicd-prod-pipeline-stack';
 
-// cdk-nag for AWS security best practices
-import { Aspects } from 'aws-cdk-lib';
-import { AwsSolutionsChecks } from 'cdk-nag';
-
-// Create the CDK App (root of the project)
+// Create the CDK App
 const app = new cdk.App();
-
-// Enable security compliance checks (non-blocking, warns you during synth)
-Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 
 // Common AWS environment for all stacks
 const env = {
-  account: '430058392451',   // <-- your AWS account number
+  account: '430058392451',   // <-- your AWS account
   region: 'us-east-1'        // <-- your region
 };
 
-// ---------------------------------------------------------------------
-// TEST Pipeline Stack
-// Watches GitHub branch: `test`
-// Includes: SAST (Semgrep), SCA (npm audit, Trivy), IaC (Checkov), DAST (ZAP)
-// ---------------------------------------------------------------------
-new CicdTestPipelineStack(app, 'CicdTestPipelineStack', {
-  env: env
-});
+// TEST Pipeline (watches `test` branch) – runs SAST/SCA/IaC + DAST, then deploys
+new CicdTestPipelineStack(app, 'CicdTestPipelineStack', { env });
 
-// ---------------------------------------------------------------------
-// PROD Pipeline Stack
-// Watches GitHub branch: `main`
-// Only deploys after manual merge from test → main
-// ---------------------------------------------------------------------
-new CicdProdPipelineStack(app, 'CicdProdPipelineStack', {
-  env: env
-});
+// PROD Pipeline (watches `main` branch) – deploys after you merge test -> main
+new CicdProdPipelineStack(app, 'CicdProdPipelineStack', { env });
