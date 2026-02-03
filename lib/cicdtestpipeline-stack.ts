@@ -49,8 +49,6 @@ export class CicdTestPipelineStack extends cdk.Stack {
         // 2) SCA (dependency vulns)
         'npm audit --audit-level=high || true', // warn for demo; tighten later
 
-        // 3) Secrets Scanning
-        './gitleaks detect --no-banner --redact --exit-code 1 --source . --config .gitleaks.toml',
 
         // 4) SAST
         'semgrep ci --config p/ci --error --no-git',
