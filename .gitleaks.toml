@@ -1,0 +1,8 @@
+title = "gitleaks config"
+
+[allowlist]
+paths = [
+  "node_modules",
+  "cdk.out",
+  "coverage"
+]

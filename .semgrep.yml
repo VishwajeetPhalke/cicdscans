@@ -1,0 +1,8 @@
+# Keep it light: rely on default semgrep CI ruleset, reduce noise
+skip-rule:
+  - generic.secrets.high-entropy-string
+
+exclude:
+  - node_modules
+  - cdk.out
+  - coverage
