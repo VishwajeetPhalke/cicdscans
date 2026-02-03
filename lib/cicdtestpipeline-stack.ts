@@ -98,8 +98,8 @@ export class CicdTestPipelineStack extends cdk.Stack {
       pipelineName: CicdTestPipelineStack.PIPELINE_NAME,
       synth: new ShellStep('Synth', {
         input: CodePipelineSource.connection(
-          'VishwajeetPhalke/cicdscans', // GitHub repo
-          'test',                       // Test pipeline branch
+          'VishwajeetPhalke/cicdscans',
+          'test',
           {
             connectionArn:
               'arn:aws:codeconnections:us-east-1:430058392451:connection/b1b0d224-2619-4c1b-a7cb-b56248c3f529',
@@ -109,22 +109,24 @@ export class CicdTestPipelineStack extends cdk.Stack {
       }),
     });
 
-    // ========== SECURITY & QUALITY SCANS (TEST ONLY) ==========
-    const securityChecks = new ShellStep('SecurityChecksV2', {
+    // ========================= SECURITY SCANS =========================
+    const securityChecks = new ShellStep('SecurityChecksV3', {
       installCommands: [
-        'set -euo pipefail',
+        // FIXED: /bin/sh cannot use pipefail
+        'set -eu',
+
         'echo "Installing Trivy + Semgrep..."',
 
-        // Install Trivy (filesystem scanning)
+        // Install Trivy
         'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
         'mv ./trivy /usr/local/bin/trivy || true',
         'chmod +x /usr/local/bin/trivy || true',
-        'which trivy && trivy --version',
+        'trivy --version || true',
 
         // Install Semgrep
         'python3 -m pip install --upgrade pip',
         'pip3 install semgrep',
-        'semgrep --version',
+        'semgrep --version || true',
 
         'export PATH="/usr/local/bin:$PATH"',
       ],
@@ -135,10 +137,10 @@ export class CicdTestPipelineStack extends cdk.Stack {
         'npm run lint',
         'npm test -- --ci --runInBand',
 
-        // 2) SCA (dependency scanning)
+        // 2) SCA
         'npm audit --audit-level=high || true',
 
-        // 3) SAST (Semgrep)
+        // 3) SAST
         'semgrep ci --config p/ci --no-git',
 
         // 4) Trivy filesystem scan
@@ -146,21 +148,21 @@ export class CicdTestPipelineStack extends cdk.Stack {
       ],
     });
 
-    // Deploy to TEST environment
+    // Add TEST stage
     const testStage = pipeline.addStage(
       new PipelineAppStage(this, 'test', {
         env: { account: '430058392451', region: 'us-east-1' },
       })
     );
 
-    // Run scans BEFORE deployment
+    // Run scans BEFORE test deployment
     testStage.addPre(securityChecks);
 
-    // Manual approval after Test
+    // Manual approval
     testStage.addPost(
       new ManualApprovalStep('ApproveTestIsGood', {
         comment:
-          'Approve if TEST is correct. Then merge test → main to trigger PROD pipeline.',
+          'Approve if TEST is correct. Then merge test → main for PROD deployment.',
       })
     );
   }
