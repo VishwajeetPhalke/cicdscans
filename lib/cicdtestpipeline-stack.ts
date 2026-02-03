@@ -110,14 +110,12 @@ export class CicdTestPipelineStack extends cdk.Stack {
     });
 
     // ========================= SECURITY SCANS =========================
-    const securityChecks = new ShellStep('SecurityChecksV3', {
+    const securityChecks = new ShellStep('SecurityChecksV4', {
       installCommands: [
-        // FIXED: /bin/sh cannot use pipefail
         'set -eu',
-
         'echo "Installing Trivy + Semgrep..."',
 
-        // Install Trivy
+        // Trivy install
         'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
         'mv ./trivy /usr/local/bin/trivy || true',
         'chmod +x /usr/local/bin/trivy || true',
@@ -132,37 +130,31 @@ export class CicdTestPipelineStack extends cdk.Stack {
       ],
 
       commands: [
-        // 1) Code Quality
         'npm ci',
         'npm run lint',
         'npm test -- --ci --runInBand',
 
-        // 2) SCA
         'npm audit --audit-level=high || true',
 
-        // 3) SAST
-        'semgrep ci --config p/ci --no-git',
+        // FIXED: Semgrep command (NO --error, NO --no-git)
+        'semgrep ci --config p/ci',
 
-        // 4) Trivy filesystem scan
         'trivy fs . --severity HIGH,CRITICAL --exit-code 1 --no-progress --ignorefile .trivyignore',
       ],
     });
 
-    // Add TEST stage
     const testStage = pipeline.addStage(
       new PipelineAppStage(this, 'test', {
         env: { account: '430058392451', region: 'us-east-1' },
       })
     );
 
-    // Run scans BEFORE test deployment
     testStage.addPre(securityChecks);
 
-    // Manual approval
     testStage.addPost(
       new ManualApprovalStep('ApproveTestIsGood', {
         comment:
-          'Approve if TEST is correct. Then merge test → main for PROD deployment.',
+          'Approve if TEST is correct. Then merge test → main for PROD.',
       })
     );
   }
