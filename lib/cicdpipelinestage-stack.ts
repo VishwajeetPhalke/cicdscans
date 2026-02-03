@@ -1,17 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { LambdaStack } from './lambda-stack';
+import { lambdaStack } from './lambda-stack';
 
 export class PipelineAppStage extends cdk.Stage {
-  public readonly apiUrlOutput: cdk.CfnOutput;
-
   constructor(scope: Construct, id: string, props?: cdk.StageProps) {
     super(scope, id, props);
 
-    const lambda = new LambdaStack(this, 'LambdaStack', {
-      env: props?.env,
-    });
-
-    this.apiUrlOutput = lambda.apiUrlOutput;
+    // Add your app stacks for this environment
+    new lambdaStack(this, 'lambdastack', { env: props?.env });
   }
 }
