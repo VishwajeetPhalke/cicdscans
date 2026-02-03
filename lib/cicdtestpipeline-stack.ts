@@ -31,32 +31,67 @@ export class CicdTestPipelineStack extends cdk.Stack {
     });
 
     // ===== Security & Quality (TEST ONLY) =====
+    // const securityChecks = new ShellStep('SecurityChecks', {
+    //   installCommands: [
+    //     // Install security tools locally into $PWD
+    //     'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
+    //     'curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | bash -s -- -b .',
+    //     'python3 -m pip install --upgrade pip',
+    //     'pip3 install semgrep',
+    //     'export PATH=$PWD:$PATH',
+    //   ],
+    //   commands: [
+    //     // 1) Code Quality
+    //     'npm ci',
+    //     'npm run lint',
+    //     'npm test -- --ci --runInBand',
+
+    //     // 2) SCA (dependency vulns)
+    //     'npm audit --audit-level=high || true', // warn for demo; tighten later
+
+
+    //     // 4) SAST
+    //     'semgrep ci --config p/ci --error --no-git',
+
+    //     // 5) Trivy filesystem (SCA + misconfig)
+    //     './trivy fs . --severity HIGH,CRITICAL --exit-code 1 --no-progress --ignorefile .trivyignore',
+    //   ],
+    // });
+
     const securityChecks = new ShellStep('SecurityChecks', {
-      installCommands: [
-        // Install security tools locally into $PWD
-        'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
-        'curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | bash -s -- -b .',
-        'python3 -m pip install --upgrade pip',
-        'pip3 install semgrep',
-        'export PATH=$PWD:$PATH',
-      ],
-      commands: [
-        // 1) Code Quality
-        'npm ci',
-        'npm run lint',
-        'npm test -- --ci --runInBand',
+  installCommands: [
+    'set -euo pipefail',
+    'echo "Installing Trivy + Semgrep..."',
 
-        // 2) SCA (dependency vulns)
-        'npm audit --audit-level=high || true', // warn for demo; tighten later
+    // Install Trivy (filesystem mode)
+    'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
+    'sudo mv ./trivy /usr/local/bin/trivy || mv ./trivy /usr/local/bin/trivy',
+    'which trivy && trivy --version',
 
+    // Install Semgrep
+    'python3 -m pip install --upgrade pip',
+    'pip3 install semgrep',
+    'semgrep --version',
 
-        // 4) SAST
-        'semgrep ci --config p/ci --error --no-git',
+    'export PATH="/usr/local/bin:$PATH"'
+  ],
 
-        // 5) Trivy filesystem (SCA + misconfig)
-        './trivy fs . --severity HIGH,CRITICAL --exit-code 1 --no-progress --ignorefile .trivyignore',
-      ],
-    });
+  commands: [
+    // 1) Code Quality
+    'npm ci',
+    'npm run lint',
+    'npm test -- --ci --runInBand',
+
+    // 2) SCA (dependencies)
+    'npm audit --audit-level=high || true',
+
+    // 3) SAST (Semgrep)
+    'semgrep ci --config p/ci --no-git',
+
+    // 4) SCA + misconfig (Trivy filesystem)
+    'trivy fs . --severity HIGH,CRITICAL --exit-code 1 --no-progress --ignorefile .trivyignore'
+  ],
+});
 
     // Deploy to TEST environment
     const testStage = pipeline.addStage(
