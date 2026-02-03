@@ -5,87 +5,77 @@ import {
   CodePipelineSource,
   ShellStep,
   ManualApprovalStep,
-  CodeBuildStep
 } from 'aws-cdk-lib/pipelines';
-import * as codebuild from 'aws-cdk-lib/aws-codebuild';
-
 import { PipelineAppStage } from './cicdpipelinestage-stack';
 
 export class CicdTestPipelineStack extends cdk.Stack {
+  public static readonly PIPELINE_NAME = 'CICD-Pipeline-Test';
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     const pipeline = new CodePipeline(this, 'TestPipeline', {
-      pipelineName: 'CICD-Pipeline-Test',
+      pipelineName: CicdTestPipelineStack.PIPELINE_NAME,
       synth: new ShellStep('Synth', {
         input: CodePipelineSource.connection(
-          'VishwajeetPhalke/cicdcostdash2',
-          'test',
+          'VishwajeetPhalke/cicdscans', // GitHub repo
+          'test',                           // Test watches 'test'
           {
             connectionArn:
-              'arn:aws:codeconnections:us-east-1:430058392451:connection/b1b0d224-2619-4c1b-a7cb-b56248c3f529'
+              'arn:aws:codeconnections:us-east-1:430058392451:connection/b1b0d224-2619-4c1b-a7cb-b56248c3f529',
+            // triggerOnPush: true (default) → runs on ANY file change in 'test'
           }
         ),
-        commands: ['npm ci || npm install', 'npm run build', 'npx cdk synth'],
+        commands: ['npm ci', 'npm run build', 'npx cdk synth'],
       }),
     });
 
-    // --- SECURITY WAVE ---
-    const securityWave = pipeline.addWave('SecurityChecks');
-
-    securityWave.addPost(new CodeBuildStep('EnterpriseSecuritySuite', {
-      commands: [
+    // ===== Security & Quality (TEST ONLY) =====
+    const securityChecks = new ShellStep('SecurityChecks', {
+      installCommands: [
+        // Install security tools locally into $PWD
+        'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b .',
+        'curl -sSfL https://raw.githubusercontent.com/gitleaks/gitleaks/master/install.sh | bash -s -- -b .',
         'python3 -m pip install --upgrade pip',
-
-        // SAST: Semgrep
-        'pip install semgrep',
-        'semgrep ci --metrics=off || true',
-
-        // SCA: npm audit
-        'npm ci || npm install',
-        'npm audit --audit-level=high || true',
-
-        // IaC: Checkov
-        'pip install checkov',
-        'checkov -d . || true',
-
-        // IaC + Secrets + FS: Trivy
-        'curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin',
-        'trivy fs . --exit-code 0 --severity HIGH,CRITICAL || true',
-        'trivy config . --exit-code 0 --severity HIGH,CRITICAL || true',
+        'pip3 install semgrep',
+        'export PATH=$PWD:$PATH',
       ],
-      buildEnvironment: {
-        buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
-      }
-    }));
-
-    // --- DEPLOY TO TEST ---
-    const testApp = new PipelineAppStage(this, 'test', {
-      env: { account: this.account, region: this.region },
-    });
-    const testStage = pipeline.addStage(testApp);
-
-    // --- DAST (OWASP ZAP) ---
-    testStage.addPost(new CodeBuildStep('DAST_ZAP_FullScan', {
-      envFromCfnOutputs: {
-        TARGET_URL: testApp.apiUrlOutput,
-      },
       commands: [
-        'echo "Running ZAP Full Scan on $TARGET_URL"',
-        'apt-get update && apt-get install -y docker.io',
-        'docker pull ghcr.io/zaproxy/zaproxy:stable',
-        'docker run --rm -t ghcr.io/zaproxy/zaproxy:stable zap-full-scan.py -t "$TARGET_URL" -m 5 -r zap_report.html || true',
-      ],
-      buildEnvironment: {
-        buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
-        privileged: true,
-      },
-      primaryOutputDirectory: '.'
-    }));
+        // 1) Code Quality
+        'npm ci',
+        'npm run lint',
+        'npm test -- --ci --runInBand',
 
-    // --- MANUAL APPROVAL ---
-    testStage.addPost(new ManualApprovalStep('ApproveTest', {
-      comment: 'Review security scan results before allowing TEST to finish.',
-    }));
+        // 2) SCA (dependency vulns)
+        'npm audit --audit-level=high || true', // warn for demo; tighten later
+
+        // 3) Secrets Scanning
+        './gitleaks detect --no-banner --redact --exit-code 1 --source . --config .gitleaks.toml',
+
+        // 4) SAST
+        'semgrep ci --config p/ci --error --no-git',
+
+        // 5) Trivy filesystem (SCA + misconfig)
+        './trivy fs . --severity HIGH,CRITICAL --exit-code 1 --no-progress --ignorefile .trivyignore',
+      ],
+    });
+
+    // Deploy to TEST environment
+    const testStage = pipeline.addStage(
+      new PipelineAppStage(this, 'test', {
+        env: { account: '430058392451', region: 'us-east-1' },
+      })
+    );
+
+    // Run scans BEFORE deploying to TEST
+    testStage.addPre(securityChecks);
+
+    // Manual approval at the end (pipeline shows SUCCEEDED after approval)
+    testStage.addPost(
+      new ManualApprovalStep('ApproveTestIsGood', {
+        comment:
+          'Approve if TEST is correct. Then manually merge test → main in GitHub to trigger the PROD pipeline.',
+      })
+    );
   }
 }

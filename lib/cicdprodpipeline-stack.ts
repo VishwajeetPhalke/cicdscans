@@ -18,7 +18,7 @@ export class CicdProdPipelineStack extends cdk.Stack {
       pipelineName: CicdProdPipelineStack.PIPELINE_NAME,
       synth: new ShellStep('Synth', {
         input: CodePipelineSource.connection(
-          'VishwajeetPhalke/cicdcostdash2', // GitHub repo
+          'VishwajeetPhalke/cicdscans', // GitHub repo
           'main',                            // Prod watches 'main'
           {
             connectionArn:
